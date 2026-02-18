@@ -42,22 +42,18 @@ public class Birmarket implements ProductParser {
             product.setSourceSite("BIRMARKET");
             product.setName(doc.select("h1").text().trim());
 
-            // 1. PRICE (Handles 79.90 precisely)
             String priceRaw = doc.select("span[data-info=item-desc-price-new]").text();
             String cleanedPrice = priceRaw.replace(",", ".").replaceAll("[^0-9.]", "").trim();
             product.setPrice(cleanedPrice.isEmpty() ? 0.0 : Double.parseDouble(cleanedPrice));
             product.setCurrency("AZN");
 
-            // 2. DESCRIPTION
             String description = doc.select("div.MPProductDescriptionContentInfo").text();
             if (description.isEmpty()) {
                 description = doc.select("div[data-info='product-info-description']").text();
             }
-            // Removing the "Təsvir" (Description) header from the text if present
             description = description.replaceFirst("(?i)^Təsvir\\s*", "").trim();
             product.setDescription(description.isEmpty() ? "No description available" : description);
 
-            // 3. REVIEWS (Includes Rating and Date)
             product.setReviews(fetchReviews(url, doc, product));
 
             return product;
@@ -70,7 +66,6 @@ public class Birmarket implements ProductParser {
     private List<Review> fetchReviews(String url, Document doc, Product product) {
         List<Review> reviews = new ArrayList<>();
 
-        // Try to extract reviews from HTML first (Static fallback)
         Elements reviewElements = doc.select("div[data-info='review-item'], div.MPProductReview");
         for (Element el : reviewElements) {
             Review review = new Review();

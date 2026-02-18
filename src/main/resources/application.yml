@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: Feedback
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:myservicedb}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:16032005}
+    driver-class-name: org.postgresql.Driver
+
+  liquibase:
+    enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: ${DDL_AUTO:create}
+    show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+
+logging:
+  level:
+    com.zaxxer.hikari.pool.HikariPool: ERROR
+
+
+    ####swagger
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    disable-swagger-default-url: true
+  api-docs:
+    path: /v3/api-docs
