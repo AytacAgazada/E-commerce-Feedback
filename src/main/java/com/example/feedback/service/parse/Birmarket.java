@@ -52,7 +52,7 @@ public class Birmarket implements ProductParser {
 
             product.setName(doc.select("h1").text().trim());
 
-            product.setReviews(fetchAllReviewsFromApi(productIdStr, product,doc));
+            product.setReviews(fetchAllReviewsFromApi(productIdStr, product));
 
             String priceRaw = doc.select("span[data-info=item-desc-price-new]").text();
             String cleanedPrice = priceRaw.replace(",", ".").replaceAll("[^0-9.]", "").trim();
@@ -83,24 +83,12 @@ public class Birmarket implements ProductParser {
         return matcher.find() ? matcher.group(1) : null;
     }
 
-    private List<Review> fetchAllReviewsFromApi(String productId, Product product, Document doc) {
-        // HTML-dən username map-i qur: index → author
-        List<String> htmlAuthors = new ArrayList<>();
-        Elements htmlReviewEls = doc.select("div[data-info='review-item']");
-        if (htmlReviewEls.isEmpty()) {
-            htmlReviewEls = doc.select("div.MPProductReview > div");
-        }
-        for (Element el : htmlReviewEls) {
-            String author = el.select("div[data-info='review-item-user'], div[class*='Author']").text().trim();
-            htmlAuthors.add(author.isEmpty() ? null : author);
-        }
-
+    private List<Review> fetchAllReviewsFromApi(String productId, Product product) {
         List<Review> allReviews = new ArrayList<>();
         int offset = 0;
         int limit = 10;
-        int reviewIndex = 0; // HTML sırası ilə uyğunlaşdırmaq üçün
 
-        while (true) {
+        while(true){
             try {
                 String apiUrl = "https://umico.az/assessment/api/v1/public/message"
                         + "?product_id=" + productId
@@ -121,18 +109,14 @@ public class Birmarket implements ProductParser {
                         .body();
 
                 JsonNode root = objectMapper.readTree(jsonResponse);
+
                 JsonNode reviewsNode = root.has("messages") ? root.get("messages") : root;
 
                 if (reviewsNode.isArray()) {
                     for (JsonNode node : reviewsNode) {
                         Review review = new Review();
 
-                        // Əvvəlcə API-dən al, boşdursa HTML-dən götür
-                        String author = node.path("user_name").asText("").trim();
-                        if (author.isEmpty() && reviewIndex < htmlAuthors.size() && htmlAuthors.get(reviewIndex) != null) {
-                            author = htmlAuthors.get(reviewIndex);
-                        }
-                        if (author.isEmpty()) author = "Anonymous";
+                        String author = node.path("customer_name").asText("Anonymous");
 
                         String content = node.path("text").asText();
                         if (content.isEmpty()) content = node.path("comment").asText();
@@ -145,17 +129,18 @@ public class Birmarket implements ProductParser {
                             review.setProduct(product);
                             allReviews.add(review);
                         }
-                        reviewIndex++;
                     }
                     offset += reviewsNode.size();
-                    if (reviewsNode.size() < limit) break;
-                } else { break; }
+
+                    if (reviewsNode.size() < limit) {
+                        break;
+                    }
+                }else {break;}
 
                 Thread.sleep(20);
 
             } catch (Exception e) {
                 log.warn("API fetch failed for product {}: {}", productId, e.getMessage());
-                break;
             }
         }
 
