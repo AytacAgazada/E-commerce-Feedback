@@ -24,6 +24,8 @@ public class Birmarket implements ProductParser {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final int API_LIMIT = 1000;
+
     @Override
     public boolean supports(String url) {
         return StringUtils.hasText(url) && (url.contains("umico.az") || url.contains("birmarket.az"));
@@ -40,7 +42,17 @@ public class Birmarket implements ProductParser {
             Product product = new Product();
             product.setUrl(url);
             product.setSourceSite("BIRMARKET");
+
+            String productIdStr = extractProductId(url);
+            if (productIdStr != null) {
+                product.setId(Long.parseLong(productIdStr));
+            } else {
+                throw new ScraperException("Product ID could not be extracted from URL");
+            }
+
             product.setName(doc.select("h1").text().trim());
+
+            product.setReviews(fetchAllReviewsFromApi(productIdStr, product,doc));
 
             String priceRaw = doc.select("span[data-info=item-desc-price-new]").text();
             String cleanedPrice = priceRaw.replace(",", ".").replaceAll("[^0-9.]", "").trim();
@@ -54,7 +66,9 @@ public class Birmarket implements ProductParser {
             description = description.replaceFirst("(?i)^Təsvir\\s*", "").trim();
             product.setDescription(description.isEmpty() ? "No description available" : description);
 
-            product.setReviews(fetchReviews(url, doc, product));
+            if (product.getReviews() == null || product.getReviews().isEmpty()) {
+                product.setReviews(fetchReviewsFromHtml(doc, product));
+            }
 
             return product;
         } catch (Exception e) {
@@ -63,72 +77,130 @@ public class Birmarket implements ProductParser {
         }
     }
 
-    private List<Review> fetchReviews(String url, Document doc, Product product) {
-        List<Review> reviews = new ArrayList<>();
-
-        Elements reviewElements = doc.select("div[data-info='review-item'], div.MPProductReview");
-        for (Element el : reviewElements) {
-            Review review = new Review();
-            String author = el.select("div[data-info='review-item-user'], div[class*='Author']").text().trim();
-            String content = el.select("div[data-info='review-item-message']").text().trim();
-            String date = el.select("div[data-info='review-item-date']").text().trim();
-
-            int rating = el.select("svg.text-yellow-400, svg[class*='yellow']").size();
-
-            if (StringUtils.hasText(content)) {
-                review.setAuthor(author.isEmpty() ? "Anonymous" : author);
-                review.setContent(content);
-                review.setReviewDate(date.isEmpty() ? "Date unknown" : date);
-                review.setRating(rating > 0 ? rating : 5);
-                review.setProduct(product);
-                reviews.add(review);
-            }
-        }
-
-        if (reviews.isEmpty()) {
-            reviews = fetchReviewsFromApi(url, product);
-        }
-
-        return reviews;
+    private String extractProductId(String url) {
+        Pattern pattern = Pattern.compile("/product/(\\d+)");
+        Matcher matcher = pattern.matcher(url);
+        return matcher.find() ? matcher.group(1) : null;
     }
 
-    private List<Review> fetchReviewsFromApi(String productUrl, Product product) {
-        List<Review> reviews = new ArrayList<>();
-        try {
-            Pattern pattern = Pattern.compile("product/(\\d+)");
-            Matcher matcher = pattern.matcher(productUrl);
+    private List<Review> fetchAllReviewsFromApi(String productId, Product product, Document doc) {
+        // HTML-dən username map-i qur: index → author
+        List<String> htmlAuthors = new ArrayList<>();
+        Elements htmlReviewEls = doc.select("div[data-info='review-item']");
+        if (htmlReviewEls.isEmpty()) {
+            htmlReviewEls = doc.select("div.MPProductReview > div");
+        }
+        for (Element el : htmlReviewEls) {
+            String author = el.select("div[data-info='review-item-user'], div[class*='Author']").text().trim();
+            htmlAuthors.add(author.isEmpty() ? null : author);
+        }
 
-            if (matcher.find()) {
-                String productId = matcher.group(1);
-                String apiUrl = "https://api.umico.az/api/v1/products/" + productId + "/reviews";
+        List<Review> allReviews = new ArrayList<>();
+        int offset = 0;
+        int limit = 10;
+        int reviewIndex = 0; // HTML sırası ilə uyğunlaşdırmaq üçün
+
+        while (true) {
+            try {
+                String apiUrl = "https://umico.az/assessment/api/v1/public/message"
+                        + "?product_id=" + productId
+                        + "&assessment_id=3"
+                        + "&offset=" + offset
+                        + "&limit=" + API_LIMIT
+                        + "&sort_by=date"
+                        + "&sort_type=desc";
+
+                log.info("Fetching reviews from API: {}", apiUrl);
 
                 String jsonResponse = Jsoup.connect(apiUrl)
                         .ignoreContentType(true)
-                        .userAgent("Mozilla/5.0")
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .header("Accept", "application/json")
+                        .timeout(15000)
                         .execute()
                         .body();
 
                 JsonNode root = objectMapper.readTree(jsonResponse);
-                JsonNode reviewsNode = root.path("reviews");
+                JsonNode reviewsNode = root.has("messages") ? root.get("messages") : root;
 
                 if (reviewsNode.isArray()) {
                     for (JsonNode node : reviewsNode) {
                         Review review = new Review();
-                        review.setAuthor(node.path("user").path("first_name").asText("Anonymous"));
-                        review.setContent(node.path("comment").asText());
-                        review.setRating(node.path("rating").asInt(5));
-                        review.setReviewDate(node.path("created_at").asText("Date unknown"));
-                        review.setProduct(product);
 
-                        if (StringUtils.hasText(review.getContent())) {
-                            reviews.add(review);
+                        // Əvvəlcə API-dən al, boşdursa HTML-dən götür
+                        String author = node.path("user_name").asText("").trim();
+                        if (author.isEmpty() && reviewIndex < htmlAuthors.size() && htmlAuthors.get(reviewIndex) != null) {
+                            author = htmlAuthors.get(reviewIndex);
                         }
+                        if (author.isEmpty()) author = "Anonymous";
+
+                        String content = node.path("text").asText();
+                        if (content.isEmpty()) content = node.path("comment").asText();
+
+                        if (StringUtils.hasText(content)) {
+                            review.setAuthor(author);
+                            review.setContent(content);
+                            review.setRating(node.path("score").asInt(5));
+                            review.setReviewDate(node.path("created_at").asText("Date unknown"));
+                            review.setProduct(product);
+                            allReviews.add(review);
+                        }
+                        reviewIndex++;
                     }
-                }
+                    offset += reviewsNode.size();
+                    if (reviewsNode.size() < limit) break;
+                } else { break; }
+
+                Thread.sleep(20);
+
+            } catch (Exception e) {
+                log.warn("API fetch failed for product {}: {}", productId, e.getMessage());
+                break;
             }
-        } catch (Exception e) {
-            log.warn("API review fetch failed: {}", e.getMessage());
+        }
+
+        log.info("Total reviews fetched from API for product {}: {}", productId, allReviews.size());
+        return allReviews;
+    }
+
+    private List<Review> fetchReviewsFromHtml(Document doc, Product product) {
+        List<Review> reviews = new ArrayList<>();
+        Elements reviewElements = doc.select("div[data-info='review-item']");
+
+        if (reviewElements.isEmpty()) {
+            reviewElements = doc.select("div.MPProductReview > div");
+        }
+
+        for (Element el : reviewElements) {
+            String author = el.select("div[data-info='review-item-user'], div[class*='Author']").text().trim();
+            String content = el.select("div[data-info='review-item-message']").text().trim();
+            String date = el.select("div[data-info='review-item-date']").text().trim();
+            int rating = extractRatingFromHtml(el);
+
+            if (StringUtils.hasText(content)) {
+                Review review = new Review();
+                review.setAuthor(author.isEmpty() ? "Anonymous" : author);
+                review.setContent(content);
+                review.setReviewDate(date.isEmpty() ? "Date unknown" : date);
+                review.setRating(rating);
+                review.setProduct(product);
+                reviews.add(review);
+            }
         }
         return reviews;
+    }
+
+    private int extractRatingFromHtml(Element reviewElement) {
+        Elements starSvgs = reviewElement.select("svg.vue-star-rating-star");
+        if (starSvgs.isEmpty()) return 5;
+
+        int filledCount = 0;
+        for (Element star : starSvgs) {
+            Element firstStop = star.selectFirst("linearGradient stop:first-child");
+            if (firstStop != null && "100%".equals(firstStop.attr("offset"))) {
+                filledCount++;
+            }
+        }
+        return filledCount > 0 ? filledCount : 5;
     }
 }
