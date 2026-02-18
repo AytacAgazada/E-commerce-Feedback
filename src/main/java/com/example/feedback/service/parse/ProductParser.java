@@ -1,4 +1,8 @@
 package com.example.feedback.service.parse;
 
-public class ProductParser {
+import com.example.feedback.entity.Product;
+
+public interface ProductParser {
+    boolean supports( String url);
+    Product parse(String url);
 }
