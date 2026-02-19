@@ -3,121 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feedback Scraper | Minimal Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Feedback Scraper | Professional Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #f4f7f6;
+            --bg: #f0f2f5;
             --primary: #4f46e5;
+            --primary-light: #eef2ff;
             --success: #10b981;
-            --text: #1f2937;
-            --border: #e5e7eb;
+            --accent: #f59e0b;
+            --white: #ffffff;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0; padding: 20px;
+            background: var(--bg);
+            margin: 0; padding: 40px 20px;
+            color: var(--text-dark);
         }
 
-        .container { max-width: 900px; margin: 0 auto; }
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        /* Card Style */
         .card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-            border: 1px solid var(--border);
+            background: var(--white);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
-        .input-group { display: flex; gap: 10px; margin: 15px 0; }
-        input {
-            flex: 1; padding: 12px; border: 1px solid var(--border);
-            border-radius: 8px; outline: none;
+        /* Scraper Input */
+        .search-area {
+            display: flex; gap: 15px; margin: 20px 0;
         }
+        input {
+            flex: 1; padding: 15px 20px; border: 2px solid #e2e8f0;
+            border-radius: 15px; font-size: 16px; transition: 0.3s;
+            outline: none;
+        }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
 
         button {
-            padding: 12px 20px; border-radius: 8px; border: none;
-            font-weight: 600; cursor: pointer; transition: 0.2s;
+            padding: 15px 30px; border-radius: 15px; border: none;
+            font-weight: 700; cursor: pointer; transition: 0.3s;
+            display: flex; align-items: center; gap: 8px;
         }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-success { background: var(--success); color: white; }
+        .btn-main { background: var(--primary); color: white; }
+        .btn-main:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(79, 70, 229, 0.3); }
 
-        /* Yığcam Cədvəl Dizaynı */
-        .table-wrapper { overflow-x: auto; margin-top: 10px; }
+        /* --- DETALLI MƏHSUL GÖRÜNÜŞÜ (LAP ƏVVƏLKİ KİMİ) --- */
+        #productResult {
+            display: none;
+            margin-top: 30px;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .product-hero {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 40px;
+            background: linear-gradient(to right, #ffffff, #fcfcfd);
+            padding: 20px;
+            border-radius: 15px;
+        }
+        .product-img-placeholder {
+            width: 100%; height: 300px; background: var(--primary-light);
+            border-radius: 12px; display: flex; align-items: center;
+            justify-content: center; font-size: 50px; color: var(--primary);
+        }
+        .badge-site {
+            background: var(--primary-light); color: var(--primary);
+            padding: 5px 12px; border-radius: 8px; font-weight: 700; font-size: 12px;
+        }
+        .price-tag {
+            font-size: 36px; font-weight: 800; color: var(--primary);
+            margin: 15px 0; letter-spacing: -1px;
+        }
+        .description-box {
+            background: #f8fafc; padding: 20px; border-radius: 12px;
+            border: 1px dashed #cbd5e1; line-height: 1.7; color: var(--text-gray);
+        }
+
+        /* Table Design */
+        .minimal-table-card { padding: 20px; }
         table { width: 100%; border-collapse: collapse; }
-        th { background: #f9fafb; padding: 12px; text-align: left; border-bottom: 2px solid var(--border); font-size: 0.85rem; }
-        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { text-align: left; padding: 15px; color: var(--text-gray); font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #f1f5f9; }
+        td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-weight: 500; }
+        .id-pill { background: #334155; color: white; padding: 4px 10px; border-radius: 6px; font-size: 12px; }
 
-        #productResult { display: none; padding: 15px; background: #f0fdf4; border-radius: 8px; margin-top: 15px; }
-        .loader { display: none; color: var(--primary); font-weight: bold; margin-bottom: 10px; }
+        /* Loader */
+        .loader-spin {
+            display: none; width: 24px; height: 24px;
+            border: 3px solid #FFF; border-bottom-color: transparent;
+            border-radius: 50%; animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
 <div class="container">
+
     <div class="card">
-        <h3 style="margin-top:0">🔍 Yeni Skrap</h3>
-        <div class="input-group">
-            <input type="text" id="urlInput" placeholder="Məhsul linkini bura qoyun...">
-            <button class="btn-primary" onclick="handleScrape()">Məlumatı Çək</button>
+        <h1 style="margin:0; font-size: 28px; letter-spacing: -1px;">AI Feedback <span style="color:var(--primary)">Scraper</span></h1>
+        <p style="color:var(--text-gray)">Məhsul linkini daxil edin və bütün datanı dərhal əldə edin.</p>
+
+        <div class="search-area">
+            <input type="text" id="urlInput" placeholder="https://umico.az/... və ya https://birmarket.az/...">
+            <button class="btn-main" onclick="handleScrape()">
+                <span id="btnText">Məlumatı Çək</span>
+                <div id="loader" class="loader-spin"></div>
+            </button>
         </div>
-        <div id="scrapeLoader" class="loader">⚙️ Emal edilir...</div>
+
         <div id="productResult">
-            <strong>✅ Məhsul tapıldı:</strong> <span id="pNameDisplay"></span>
+            <div class="product-hero">
+                <div class="product-img-placeholder">📦</div>
+                <div>
+                    <span class="badge-site" id="pSource"></span>
+                    <h2 id="pName" style="margin: 10px 0 5px 0; font-size: 24px;"></h2>
+                    <p style="margin:0; color:var(--text-gray)">Baza ID: <strong id="pIdVal"></strong></p>
+                    <div class="price-tag"><span id="pPrice"></span> <span id="pCurrency"></span></div>
+
+                    <h4 style="margin: 20px 0 10px 0;">Məhsul haqqında:</h4>
+                    <div class="description-box" id="pDesc"></div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin:0">📦 Mövcud Məhsullar</h3>
-            <button onclick="loadAllProducts()" style="background:#eee; padding: 5px 10px; font-size: 0.8rem;">Yenilə</button>
+    <div class="card minimal-table-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin:0">📦 Baza Arxiv (Minimal)</h3>
+            <button onclick="loadMinimalProducts()" style="background:none; border:none; color:var(--primary); cursor:pointer; font-weight:600;">🔄 Siyahını Yenilə</button>
         </div>
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                <tr>
-                    <th style="width: 80px;">ID</th>
-                    <th>MƏHSUL ADI</th>
-                </tr>
-                </thead>
-                <tbody id="allProductsBody">
-                <tr><td colspan="2" style="text-align:center; color:#999">Siyahı boşdur</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 100px;">ID</th>
+                <th>MƏHSULUN ADI</th>
+            </tr>
+            </thead>
+            <tbody id="minimalBody"></tbody>
+        </table>
     </div>
 
     <div class="card">
-        <h3 style="margin-top:0">💬 Rəyləri Göstər</h3>
-        <div class="input-group" style="max-width: 400px;">
-            <input type="number" id="idInput" placeholder="Məhsul ID-si daxil edin">
-            <button class="btn-success" onclick="fetchReviews()">Gətir</button>
+        <h3>💬 Müştəri Rəyləri</h3>
+        <div class="search-area" style="max-width: 450px;">
+            <input type="number" id="idInput" placeholder="ID daxil edin...">
+            <button class="btn-main" style="background:var(--success)" onclick="fetchReviews()">Rəyləri Gör</button>
         </div>
-        <div class="table-wrapper">
-            <table id="reviewsTable" style="display: none;">
-                <thead>
-                <tr>
-                    <th>Müəllif</th>
-                    <th>Rəy</th>
-                    <th>Reytinq</th>
-                </tr>
-                </thead>
-                <tbody id="reviewsBody"></tbody>
-            </table>
-        </div>
+        <table id="reviewsTable" style="display:none; margin-top:20px;">
+            <thead>
+            <tr>
+                <th>Müəllif</th>
+                <th>Rəy</th>
+                <th style="width: 100px;">Reytinq</th>
+            </tr>
+            </thead>
+            <tbody id="reviewsBody"></tbody>
+        </table>
     </div>
+
 </div>
 
 <script>
     const BASE_URL = '/api/scrapers';
 
-    // 1. Skrap
+    // 1. SKRAP FUNKSİYASI
     async function handleScrape() {
         const url = document.getElementById('urlInput').value;
-        if(!url) return alert("Link daxil edin!");
-        document.getElementById('scrapeLoader').style.display = 'block';
+        if(!url) return;
+
+        const btnText = document.getElementById('btnText');
+        const loader = document.getElementById('loader');
+        const resultDiv = document.getElementById('productResult');
+
+        btnText.style.display = 'none';
+        loader.style.display = 'block';
+        resultDiv.style.display = 'none';
+
         try {
             const response = await fetch(`${BASE_URL}/scrape_Product`, {
                 method: 'POST',
@@ -125,50 +196,64 @@
                 body: JSON.stringify({ url: url })
             });
             const data = await response.json();
-            document.getElementById('pNameDisplay').innerText = data.name;
-            document.getElementById('productResult').style.display = 'block';
-            loadAllProducts();
-        } catch (e) { alert("Xəta!"); }
-        finally { document.getElementById('scrapeLoader').style.display = 'none'; }
+
+            // Məlumatları doldururuq
+            document.getElementById('pName').innerText = data.name;
+            document.getElementById('pPrice').innerText = data.price;
+            document.getElementById('pCurrency').innerText = data.currency;
+            document.getElementById('pSource').innerText = data.sourceSite;
+            document.getElementById('pDesc').innerText = data.description;
+            document.getElementById('pIdVal').innerText = data.id;
+
+            resultDiv.style.display = 'block';
+            loadMinimalProducts(); // Siyahını yenilə
+        } catch (e) {
+            alert("Məlumat tapılmadı!");
+        } finally {
+            btnText.style.display = 'block';
+            loader.style.display = 'none';
+        }
     }
 
-    // 2. Siyahı (Yalnız ID və Ad)
-    async function loadAllProducts() {
-        const tbody = document.getElementById('allProductsBody');
+    // 2. MİNİMAL SİYAHI (ID & NAME)
+    async function loadMinimalProducts() {
+        const tbody = document.getElementById('minimalBody');
         try {
-            const response = await fetch(`${BASE_URL}/product/all`);
+            const response = await fetch(`${BASE_URL}/product/all-minimal`);
             const products = await response.json();
             tbody.innerHTML = '';
             products.forEach(p => {
                 tbody.innerHTML += `<tr>
-                    <td><code>${p.id}</code></td>
-                    <td><strong>${p.name}</strong></td>
+                    <td><span class="id-pill">${p.id}</span></td>
+                    <td>${p.name}</td>
                 </tr>`;
             });
-        } catch (e) { console.error("Siyahı gəlmədi"); }
+        } catch (e) { console.error("Siyahı xətası"); }
     }
 
-    // 3. Rəylər
+    // 3. REYLER
     async function fetchReviews() {
         const id = document.getElementById('idInput').value;
         const tbody = document.getElementById('reviewsBody');
         const table = document.getElementById('reviewsTable');
+        if(!id) return;
+
         try {
             const response = await fetch(`${BASE_URL}/product-reviews/${id}`);
             const reviews = await response.json();
             tbody.innerHTML = '';
             reviews.forEach(r => {
                 tbody.innerHTML += `<tr>
-                    <td>${r.author}</td>
-                    <td>${r.content}</td>
-                    <td>⭐ ${r.rating}</td>
+                    <td><strong>${r.author}</strong></td>
+                    <td style="color:var(--text-gray)">${r.content}</td>
+                    <td style="color:var(--accent)">★ ${r.rating}</td>
                 </tr>`;
             });
             table.style.display = 'table';
-        } catch (e) { alert("Rəylər tapılmadı!"); }
+        } catch (e) { alert("Xəta!"); }
     }
 
-    window.onload = loadAllProducts;
+    window.onload = loadMinimalProducts;
 </script>
 </body>
 </html>
