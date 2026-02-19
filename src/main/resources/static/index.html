@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Scraper | Minimal Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f4f7f6;
+            --primary: #4f46e5;
+            --success: #10b981;
+            --text: #1f2937;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0; padding: 20px;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .input-group { display: flex; gap: 10px; margin: 15px 0; }
+        input {
+            flex: 1; padding: 12px; border: 1px solid var(--border);
+            border-radius: 8px; outline: none;
+        }
+
+        button {
+            padding: 12px 20px; border-radius: 8px; border: none;
+            font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+
+        /* Yığcam Cədvəl Dizaynı */
+        .table-wrapper { overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f9fafb; padding: 12px; text-align: left; border-bottom: 2px solid var(--border); font-size: 0.85rem; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+
+        #productResult { display: none; padding: 15px; background: #f0fdf4; border-radius: 8px; margin-top: 15px; }
+        .loader { display: none; color: var(--primary); font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h3 style="margin-top:0">🔍 Yeni Skrap</h3>
+        <div class="input-group">
+            <input type="text" id="urlInput" placeholder="Məhsul linkini bura qoyun...">
+            <button class="btn-primary" onclick="handleScrape()">Məlumatı Çək</button>
+        </div>
+        <div id="scrapeLoader" class="loader">⚙️ Emal edilir...</div>
+        <div id="productResult">
+            <strong>✅ Məhsul tapıldı:</strong> <span id="pNameDisplay"></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0">📦 Mövcud Məhsullar</h3>
+            <button onclick="loadAllProducts()" style="background:#eee; padding: 5px 10px; font-size: 0.8rem;">Yenilə</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th>MƏHSUL ADI</th>
+                </tr>
+                </thead>
+                <tbody id="allProductsBody">
+                <tr><td colspan="2" style="text-align:center; color:#999">Siyahı boşdur</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0">💬 Rəyləri Göstər</h3>
+        <div class="input-group" style="max-width: 400px;">
+            <input type="number" id="idInput" placeholder="Məhsul ID-si daxil edin">
+            <button class="btn-success" onclick="fetchReviews()">Gətir</button>
+        </div>
+        <div class="table-wrapper">
+            <table id="reviewsTable" style="display: none;">
+                <thead>
+                <tr>
+                    <th>Müəllif</th>
+                    <th>Rəy</th>
+                    <th>Reytinq</th>
+                </tr>
+                </thead>
+                <tbody id="reviewsBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const BASE_URL = '/api/scrapers';
+
+    // 1. Skrap
+    async function handleScrape() {
+        const url = document.getElementById('urlInput').value;
+        if(!url) return alert("Link daxil edin!");
+        document.getElementById('scrapeLoader').style.display = 'block';
+        try {
+            const response = await fetch(`${BASE_URL}/scrape_Product`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url })
+            });
+            const data = await response.json();
+            document.getElementById('pNameDisplay').innerText = data.name;
+            document.getElementById('productResult').style.display = 'block';
+            loadAllProducts();
+        } catch (e) { alert("Xəta!"); }
+        finally { document.getElementById('scrapeLoader').style.display = 'none'; }
+    }
+
+    // 2. Siyahı (Yalnız ID və Ad)
+    async function loadAllProducts() {
+        const tbody = document.getElementById('allProductsBody');
+        try {
+            const response = await fetch(`${BASE_URL}/product/all`);
+            const products = await response.json();
+            tbody.innerHTML = '';
+            products.forEach(p => {
+                tbody.innerHTML += `<tr>
+                    <td><code>${p.id}</code></td>
+                    <td><strong>${p.name}</strong></td>
+                </tr>`;
+            });
+        } catch (e) { console.error("Siyahı gəlmədi"); }
+    }
+
+    // 3. Rəylər
+    async function fetchReviews() {
+        const id = document.getElementById('idInput').value;
+        const tbody = document.getElementById('reviewsBody');
+        const table = document.getElementById('reviewsTable');
+        try {
+            const response = await fetch(`${BASE_URL}/product-reviews/${id}`);
+            const reviews = await response.json();
+            tbody.innerHTML = '';
+            reviews.forEach(r => {
+                tbody.innerHTML += `<tr>
+                    <td>${r.author}</td>
+                    <td>${r.content}</td>
+                    <td>⭐ ${r.rating}</td>
+                </tr>`;
+            });
+            table.style.display = 'table';
+        } catch (e) { alert("Rəylər tapılmadı!"); }
+    }
+
+    window.onload = loadAllProducts;
+</script>
+</body>
+</html>

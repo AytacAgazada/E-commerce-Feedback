@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 public class ProductMapper {
     public ProductResponse toDto(Product entity) {
         return ProductResponse.builder()
+                .id(entity.getId())
                 .name(entity.getName())
                 .price(entity.getPrice())
                 .currency(entity.getCurrency())
